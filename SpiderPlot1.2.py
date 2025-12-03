@@ -28,7 +28,7 @@ from matplotlib.transforms import Affine2D
 #number of lectin classes (axes) shown
 N=7
 #filepath should have all PCA AND dimer .json files 
-filepath="E:\Sheston\Spider Plot\EGFR Spider Plot"
+filepath="F:\Spatial glycoproteomics data\EGFR Corrected\EGFR\Spider plot"
 #Decide on whether you want to save the analysis results
 save = True
 FIGFORMAT = '.pdf'

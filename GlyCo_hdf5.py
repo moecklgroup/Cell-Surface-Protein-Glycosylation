@@ -42,7 +42,7 @@ FIGFORMAT = '.pdf'
 #Is protein preset in your dataset
 protein_present = True
 #Enter the name of protein as in the file
-protein = "MMP14"
+protein = "EGFR"
 #Decide if you want to consider dimers
 consider_dimers=True
  
@@ -51,15 +51,16 @@ consider_dimers=True
 matplotlib.use('Qt5Agg')
 #kEY TO LOOK IN THE YAML FILE
 key_for_area = "Total Picked Area (um^2)"
+key_for_protein_number = "Number of Clusters"
 # Radius for neighborhood in nanometers ( Biologically relevant distance to find the neighbouring glycan)
 radius = 35
 #radius for dimer
-dimer_radius = 14
+dimer_radius = 36
 #set the number of classes o be mapped
 number_to_plot =5 #tp x to plot
 #Location to the folder containing cluster centers
 #pathLocsPoints = r"E:\2025-01-14_DNS006_MPZPM\FOV2\PAINT\Cell1 new clustering\90_Custom Centers"
-pathLocsPoints = r"H:\2025-06-17_MCF10AT_MMP14_DS038\FOV3\PAINT\Cell1\90_Custom Centers"
+pathLocsPoints = r"F:\Spatial glycoproteomics data\EGFR Corrected\EGFR\FOV3\Cell3\90_Custom Centers"
 #convert the location to a path object
 localization_folder = Path(pathLocsPoints)
 #Search for yaml files in the folder (yaml files are created as a metadata for any reslts from picasso)
@@ -72,6 +73,21 @@ with open(yaml_file,'r') as file:
     for info in documents:
         if isinstance(info, dict) and key_for_area in info:
             area_of_cell = np.float32(info[key_for_area])
+#Fetching yaml file for protein        
+for p_file in localization_folder.iterdir():
+    if p_file.is_file():        
+        if protein in p_file.name.split("_") and p_file.suffix =='.yaml':
+            protein_yaml_file = p_file
+#Fetch number of proteins from the yaml file for proteins        
+  
+with open(protein_yaml_file,'r') as protein_meta_file:
+    #load the data. Multiple documents are present in a single file. 
+    documents = yaml.safe_load_all(protein_meta_file)
+    for info in documents:
+        if isinstance(info, dict) and key_for_protein_number in info:
+            number_of_protein = np.float32(info[key_for_protein_number])
+    
+           
 
 
 #%%HDF5 handling
@@ -290,7 +306,7 @@ final_pair_wise_duplicates_removed = duplicates_removed_tuple_list(final_list_of
 #result_list = [tuple(element.split("_")[0] for element in tup) for tup in final_pair_wise_duplicates_removed]
 result_list = [tuple(sorted(element.split("_")[0] for element in tup)) for tup in final_pair_wise_duplicates_removed]
 result_list[:] = [tuple(sorted(tup)) for tup in result_list]
-
+# removing te classes with more than one protein as they are potential dimer or polymers
 if protein_present and consider_dimers:
     result_list = [t for t in result_list if t.count(protein) < 2]
     
@@ -362,7 +378,7 @@ if save == True:
 
 sorted_counter = dict(sorted(class_counter.items(), key=lambda item: item[1], reverse=True))
 num_classes = {str(key): value for key, value in sorted_counter.items()}
-
+number_of_glycosylated_monomers = sum(num_classes.values())
 # Save to a JSON file
 if save == True:
     with open(output_file_path, 'w') as json_file:
@@ -497,14 +513,14 @@ if save == True:
 #%% this part of the code is developed exclusively to cater the need to consider the dimer glycosylation
 
 polymer_neighbor_master = {}
-distance_indexed_ploymer_neighbor = {}
+distance_indexed_polymer_neighbor = {}
 assigned_points = {}
 if protein_present and consider_dimers:
     df_of_interest_key = protein
     
     com_name = f"neighbors_of_{df_of_interest_key}" #center of mass name to be used as  the key in the dictionaries
     polymer_neighbor_master[com_name] = {}
-    distance_indexed_ploymer_neighbor[com_name] = {}
+    distance_indexed_polymer_neighbor[com_name] = {}
     
     trees = {key: KDTree((df[['x', 'y']]*130).values) for key, df in data_dict.items() if key ==df_of_interest_key}
     # Keep track of assigned points in each dataset
@@ -541,17 +557,27 @@ if protein_present and consider_dimers:
     for neighbor_family, family_member in assigned_points.items():
         for idx, (distance, df_of_interest_idx) in family_member.items():
             polymer_neighbor_master[com_name].setdefault(f'{df_of_interest_key}_{df_of_interest_idx}', []).append(f'{neighbor_family}_{idx}')    
-            distance_indexed_ploymer_neighbor[com_name].setdefault(f'{df_of_interest_key}_{df_of_interest_idx}', []).append((f'{neighbor_family}_{idx}', distance))    
+            distance_indexed_polymer_neighbor[com_name].setdefault(f'{df_of_interest_key}_{df_of_interest_idx}', []).append((f'{neighbor_family}_{idx}', distance))    
         
 
 polymer_tuple_list = nested_dict_to_tuple_list(polymer_neighbor_master)
-ploymer_list_without_mirror_duplicates=duplicates_removed_tuple_list(polymer_tuple_list)
-flattened_polymer_list= [element for tup in ploymer_list_without_mirror_duplicates for element in tup]
+polymer_list_without_mirror_duplicates=duplicates_removed_tuple_list(polymer_tuple_list)
+flattened_polymer_list= [element for tup in polymer_list_without_mirror_duplicates for element in tup]
 elemental_duplicates_in_polymers = find_duplicates_with_counts(flattened_polymer_list) # This is not currently removed
+#Number of unique elements in the list. This will give the number of all the proteins that have another protein as a neighbor.
+unique_items_in_flattened_polymer_list = set(flattened_polymer_list)
 
 #filter out dimers from polymers detected
-dimer_list= [t for t in ploymer_list_without_mirror_duplicates if len(t) == 2]
+dimer_list= [t for t in polymer_list_without_mirror_duplicates if len(t) == 2]
+test_flat = [element for tup in dimer_list for element in tup]
+duplicates_in_test_flat = find_duplicates_with_counts(test_flat) #this shows finally how many duplicates are still in the dimers.
+dimer_report = {"number of proteins": number_of_protein,
+                "number of monomers" : number_of_protein - len(unique_items_in_flattened_polymer_list),
+                "number of glycosylated monomers" : number_of_glycosylated_monomers,
+                "number of dimers " : len(dimer_list),
+                "number of polymer" : len(polymer_list_without_mirror_duplicates)-len(dimer_list)}
 
+#make a KDTree with the locations of glycans 
 tree_for_dimer = {key: KDTree((df[['x', 'y']]*130).values) for key, df in data_dict.items() if key != protein}
 
 
@@ -588,6 +614,8 @@ for tup in dimer_glycosylation:
 # Sort each tuple alphabetically
 index_removed_dimer_glycosylation = [tuple(sorted(tup)) for tup in index_removed_dimer_glycosylation]
 
+dimer_report["number of glycosylated dimers"] = len(index_removed_dimer_glycosylation)
+
 # Count frequency
 frequency = Counter(index_removed_dimer_glycosylation)
 
@@ -599,9 +627,13 @@ dimers_per_sq_microns_sorted = OrderedDict(
     sorted(dimers_per_sq_microns.items(), key=lambda x: x[1], reverse=True))
 # Save to JSON
 if save:
-    dimer_glycosylation_file_path = localization_folder / f"{timestamp}_dimer_glycosylation_per_sq_microns.json"
+    dimer_glycosylation_file_path = localization_folder / f"{timestamp}_{dimer_radius}nm_dimer_glycosylation_per_sq_microns.json"
     with open(dimer_glycosylation_file_path, 'w') as file:
         json.dump(dimers_per_sq_microns_sorted, file, indent=4)
+    dimer_report_file = localization_folder / f"{timestamp}_dimer_report.json"
+    with open(dimer_report_file, 'w') as file:
+        json.dump(dimer_report, file, indent=4)
+plt.close("all")
 
 
             

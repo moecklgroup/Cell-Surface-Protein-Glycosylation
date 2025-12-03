@@ -24,6 +24,7 @@ protein_present = True
 protein = "EGFR"
 consider_dimers = True
 glyco_radius =37
+dimer_radius =38
 #Decide on whether you want to save the analysis results
 save = True
 #Boolean for controlling the representation of the glycan maps depending on cell sizes. 
@@ -116,6 +117,7 @@ for var in list(globals().keys()):
                    "FIGFORMAT",
                    "protein_present",
                    "glyco_radius",
+                   "dimer_radius",
                    "save",
                    "zoom",
                    "protein",
@@ -161,8 +163,6 @@ FIGFORMAT = '.pdf'
 matplotlib.use('Qt5Agg')
 #kEY TO LOOK IN THE YAML FILE
 key_for_area = "Total Picked Area (um^2)"
-# Radius for neighborhood in nanometers ( Biologically relevant distance to find the neighbouring glycan)
-glyco_radius = 37
 #set the number of classes o be mapped
 number_to_plot =5 #tp x to plot
 #Location to the folder containing cluster centers
@@ -628,7 +628,7 @@ if protein_present and consider_dimers:
         # Check for neighbors in all other DataFrames using their KDTree. Iterate through each tree.
         for current_family, current_family_members in trees.items(): #Current family = key and curent family members=KDtree
             #Generates a list of indices coresponding to the dataframe 
-            indices = current_family_members.query_ball_point([x1, y1], r=glyco_radius)
+            indices = current_family_members.query_ball_point([x1, y1], r=dimer_radius)
             filtered_indices = [num for num in indices if df_of_interest_key != current_family or num != row_index_of_com]
            
             if  filtered_indices:
