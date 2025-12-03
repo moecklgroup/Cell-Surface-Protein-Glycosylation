@@ -330,7 +330,7 @@ def remove_distance(data):
         # Iterate through each key-value pair in the sub-dictionary
         for sub_key, tuple_list in sub_dict.items():
             sub_dict[sub_key] = [elem[0] for elem in tuple_list]
-        return data
+    return data
 
            
 #%%convert sub dictionary in a nested dictionary to a list of tuples

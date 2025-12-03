@@ -53,7 +53,7 @@ matplotlib.use('Qt5Agg')
 key_for_area = "Total Picked Area (um^2)"
 key_for_protein_number = "Number of Clusters"
 # Radius for neighborhood in nanometers ( Biologically relevant distance to find the neighbouring glycan)
-radius = 35
+glyco_radius = 35
 #radius for dimer
 dimer_radius = 36
 #set the number of classes o be mapped
@@ -145,7 +145,7 @@ for df_key in data_dict:
         # Check for neighbors in all other DataFrames using their KDTree. Iterate through each tree.
         for current_family, current_family_members in trees.items(): #Current family = key and curent family members=KDtree
             #Generates a list of indices coresponding to the dataframe 
-            indices = current_family_members.query_ball_point([x1, y1], r=radius)
+            indices = current_family_members.query_ball_point([x1, y1], r=glyco_radius)
             #Preventing same point as the neighbor of itself
             filtered_indices = [num for num in indices if df_key != current_family or num != row_index_of_com]
 
@@ -238,7 +238,8 @@ def remove_distance(data):
         # Iterate through each key-value pair in the sub-dictionary
         for sub_key, tuple_list in sub_dict.items():
             sub_dict[sub_key] = [elem[0] for elem in tuple_list]
-        return data
+    
+    return data
 
            
 #%%convert sub dictionary in a nested dictionary to a list of tuples
@@ -368,13 +369,13 @@ plt.xticks(fontsize = tick_font_size)
 plt.yticks(fontsize = tick_font_size)
 plt.show()
 if save ==True:
-    plt.savefig(localization_folder/f"{timestamp}_Lectin_Classes_ per_sq-microns_{radius}nm{FIGFORMAT}",bbox_inches='tight')   
+    plt.savefig(localization_folder/f"{timestamp}_Lectin_Classes_ per_sq-microns_{glyco_radius}nm{FIGFORMAT}",bbox_inches='tight')   
      
 #%%Save classes to json file
 
 # Save class counts
 if save == True:
-    output_file_path = localization_folder / f"{timestamp}_Number_of_Lectin_Classes_{radius}nm.json"
+    output_file_path = localization_folder / f"{timestamp}_Number_of_Lectin_Classes_{glyco_radius}nm.json"
 
 sorted_counter = dict(sorted(class_counter.items(), key=lambda item: item[1], reverse=True))
 num_classes = {str(key): value for key, value in sorted_counter.items()}
@@ -385,7 +386,7 @@ if save == True:
         json.dump(num_classes, json_file, indent=4)
 #Save Class count per unit area   
 if save == True:
-    PCA_output_file_path = localization_folder / f"{timestamp}_Lectin_Classes_ per_sq-microns_for_PCA_{radius}nm.json"
+    PCA_output_file_path = localization_folder / f"{timestamp}_Lectin_Classes_ per_sq-microns_for_PCA_{glyco_radius}nm.json"
 
 sorted_counter = dict(sorted(class_counter.items(), key=lambda item: item[1], reverse=True))
 class_per_area = {str(key): value/area_of_cell for key, value in sorted_counter.items()}
@@ -507,7 +508,7 @@ plt.grid(False)
 # Show the plot
 plt.show()
 if save == True:
-    plt.savefig(localization_folder/f"{timestamp}_Class_location_{radius}nm{FIGFORMAT}",bbox_inches='tight') 
+    plt.savefig(localization_folder/f"{timestamp}_Class_location_{glyco_radius}nm{FIGFORMAT}",bbox_inches='tight') 
 
      
 #%% this part of the code is developed exclusively to cater the need to consider the dimer glycosylation
@@ -596,7 +597,7 @@ for tuple_of_dimers in dimer_list:
         # search in all KDTree families
         for current_family, current_family_tree in tree_for_dimer.items():
             # neighbor indices for that family
-            neighbor_idxs = current_family_tree.query_ball_point([x_val, y_val], r=radius)
+            neighbor_idxs = current_family_tree.query_ball_point([x_val, y_val], r=glyco_radius)
             # build neighbor IDs
             neighbors = [f"{current_family}_{neighbor_idx}" for neighbor_idx in neighbor_idxs]
             coalesced_neighbors.extend(neighbors) # group together the neighbors from two monomers
