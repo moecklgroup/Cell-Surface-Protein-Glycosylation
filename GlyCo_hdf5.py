@@ -60,7 +60,7 @@ dimer_radius = 36
 number_to_plot =5 #tp x to plot
 #Location to the folder containing cluster centers
 #pathLocsPoints = r"E:\2025-01-14_DNS006_MPZPM\FOV2\PAINT\Cell1 new clustering\90_Custom Centers"
-pathLocsPoints = r"F:\Spatial glycoproteomics data\EGFR Corrected\EGFR\FOV3\Cell3\90_Custom Centers"
+pathLocsPoints = r"Y:\Dijo\Insitu glycosylation_uploaded for publication\EGFR\FOV1\PAINT\Cell3\90_Custom Centers"
 #convert the location to a path object
 localization_folder = Path(pathLocsPoints)
 #Search for yaml files in the folder (yaml files are created as a metadata for any reslts from picasso)
@@ -581,7 +581,7 @@ dimer_report = {"number of proteins": number_of_protein,
 #make a KDTree with the locations of glycans 
 tree_for_dimer = {key: KDTree((df[['x', 'y']]*130).values) for key, df in data_dict.items() if key != protein}
 
-
+#%%
 dimer_glycosylation = []
 for tuple_of_dimers in dimer_list:
     coalesced_neighbors = []
@@ -605,7 +605,12 @@ for tuple_of_dimers in dimer_list:
     if coalesced_neighbors:
         glycosylated_dimer = tuple_of_dimers + tuple(coalesced_neighbors)
         dimer_glycosylation.append(glycosylated_dimer)
-
+        
+#Folllowing tests should be added in the next version of the code
+# demoflatten = flatten_tuple_list(dimer_glycosylation)
+# print("This is the demoduplicate")
+# demoduplicate = find_duplicates_with_counts(demoflatten)
+#demoremovedduplicates= eliminate_duplicates(dimer, duplicate_list)
 index_removed_dimer_glycosylation =[]
 for tup in dimer_glycosylation:
     # Remove numeric indices from each element
@@ -616,10 +621,10 @@ for tup in dimer_glycosylation:
 index_removed_dimer_glycosylation = [tuple(sorted(tup)) for tup in index_removed_dimer_glycosylation]
 
 dimer_report["number of glycosylated dimers"] = len(index_removed_dimer_glycosylation)
-
+#%%
 # Count frequency
 frequency = Counter(index_removed_dimer_glycosylation)
-
+#%%
 # Normalize by area
 dimers_per_sq_microns = {str(k): v / area_of_cell for k, v in frequency.items()}
 

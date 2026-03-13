@@ -2,132 +2,6 @@
 """
 Created on Mon Sep 30 09:26:13 2024
 This code is intended to cluster the multidimensional super resolution data within a given radius. Localization data(cluster centers) should be saved
-in a folder with the filenames starting with the corresponding lectin followed by underscores. (eg: "AAL_and whatever necesssary").
-This folder should be given as the input in the variable "localization folder". Also set the radius. The outputs are multidimensional 
-cluster information as a joson file, bar chart of the top classes, and the scatter plot of top x class location.  
-
-Codes are supposed to be run at the level of a single cell. ie. Folder containing cluster centers of individual cells
-@author: dmoonnu
-"""
-###############################CUSTOM RENDER###################################
-#User Inputs
-
-pixelsize =130
-min_locs =1
-frame_analysis = True
-#Nena Factor for clustering
-xnena = 2.35
-
-#Is protein preset in your dataset
-protein_present = True
-#Enter the name of protein as in the file
-protein = "EGFR"
-consider_dimers = True
-glyco_radius =35
-dimer_radius =36
-#Decide on whether you want to save the analysis results
-save = True
-#Boolean for controlling the representation of the glycan maps depending on cell sizes. 
-#If you have a small cell, turn this on so that the map is represented in the middle of the plot and zoomed in.
-zoom = True
-FIGFORMAT = '.pdf'
-#%%Imports
-from custom_picasso import postprocess, io
-from custom_picasso import clusterer
-import numpy as np
-import os 
-from matplotlib import pyplot as plt
-from pathlib import Path
-from tqdm import tqdm
-import json
-
-plt.rcParams['font.family'] = 'arial'
-plt.rcParams["axes.grid"] = False
-plt.rcParams["axes.edgecolor"] = "black"
-plt.rcParams["axes.facecolor"]   = "white"
-
-
-#%% Fetching info from the parameter file about analysis folder
-variables_from_parameter = {}
-with open("parameter_file.json", "r", encoding="utf-8") as f:
-    variables_from_parameter = json.load(f)
-
-# get the values from the dictionary
-localization_folder = Path(variables_from_parameter.get('localization_folder'))
-print(localization_folder)
-
-
-locs_file = []
-for hdf5 in localization_folder.glob('*.hdf5'):
-    locs_file.append(str(hdf5))
-    
-    
-#%% <<<<<<<<<<<<Perform clustering using modified packages from picasso>>>>>>>>
-#Adjust the path to the localization hdf5 file
-cluster_data_location= localization_folder/"90_Custom SMLM Clustered"
-cluster_data_location.mkdir(exist_ok=True)
-centers_location =localization_folder/"90_Custom Centers"
-centers_location.mkdir(exist_ok=True)
-for file in locs_file:
-    #locs_path = file
-    #fetch data fromthe file
-    locs, info = io.load_locs(file)
-    #Calculate NeNA Precision
-    nena= postprocess.nena(locs, info)
-    
-    #Assign radius
-    radius_xy = xnena*nena[1]
-    print(f"Clustering radius = {radius_xy*pixelsize}nm")
-    
-    #Strings for creating new filename
-    directory, filename = os.path.split(file)
-    name, extension = os.path.splitext(filename)
-    suffix= f"min_loc-{min_locs}_{xnena}XNeNA"
-    
-    output_name = f"{name}_clustered_{suffix}{extension}"
-    output_name_centers = f"{name}_centers_{suffix}{extension}"
-    
-    
-    #clustering
-    clustered_locs=clusterer.cluster(locs, radius_xy, min_locs, frame_analysis)
-    new_info = {"Number of Clusters": len(np.unique(clustered_locs.group)),
-                "Number of Clustered Locs": len(clustered_locs),
-                "Min. cluster size": min_locs,
-                "Performed basic frame analysis": frame_analysis,
-                "Percentage parameter for BFA": "90%",
-                "Number of bins for BFA": 100,
-                "Clustering radius xy (nm)": float(radius_xy * pixelsize),
-                "NeNA precision(nm)": float(nena[1]*130),
-                "Basic Frame analysis status": "First and last inclusive, 100bins used",
-                "Percentage of localization clustered": (len(clustered_locs)/len(locs))*100
-            }
-    info = info + [new_info]
-    outputpath_locs = os.path.join(str(cluster_data_location), output_name)
-    io.save_locs(outputpath_locs, clustered_locs, info)
-    print("Calculating Centers...")
-    cluster_centers = clusterer.find_cluster_centers(clustered_locs,130) #pixel size is not used incase of 2D data.
-    outputpath_centers = os.path.join(str(centers_location), output_name_centers)
-    io.save_locs(outputpath_centers, cluster_centers, info)
-    
-
-#%%Deleting the current variable to avaid any sort of overlaps
-#TODO - Fix this as this is not a good practice
-for var in list(globals().keys()):
-    if var not in ["dictionaryNames",
-                   "FIGFORMAT",
-                   "protein_present",
-                   "glyco_radius",
-                   "dimer_radius",
-                   "save",
-                   "zoom",
-                   "protein",
-                   "consider_dimers",
-                   "variables_from_parameter","centers_location", "__builtins__", "__name__", "__doc__", "__package__"]:
-        del globals()[var]
-#%%Glycosylation analysis
-"""
-Created on Mon Sep 30 09:26:13 2024
-This code is intended to cluster the multidimensional super resolution data within a given radius. Localization data(cluster centers) should be saved
 in a folder with the filenames starting with the corresponding lectin followed by underscores. (eg: "AAL_cluster_centers").
 This folder should be given as the input in the variable "localization folder". Also set the radius. The outputs are multidimensional 
 cluster information as a json file, bar chart of the top classes, and the scatter plot of top x class location.  
@@ -151,23 +25,42 @@ from collections import OrderedDict
 timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 #hide grids from all th axes
 plt.rcParams["axes.grid"] = False
+
 #set the font to arial
 plt.rcParams['font.family'] = 'arial'
+#Decide on whether you want to save the analysis results
+save = False
+#Boolean for controlling the representation of the glycan maps depending on cell sizes. 
+#If you have a small cell, turn this on so that the map is represented in the middle of the plot and zoomed in.
+zoom = True
 #Set font size required on plots
 label_font_size = 10
 title_font_size = 10
+
 tick_font_size = 10
 FIGFORMAT = '.pdf'
+#Is protein preset in your dataset
+protein_present = True
+#Enter the name of protein as in the file
+protein = "EGFR"
+#Decide if you want to consider dimers
+consider_dimers=True
+ 
+
 # Set the graphics backend to Qt
 matplotlib.use('Qt5Agg')
 #kEY TO LOOK IN THE YAML FILE
 key_for_area = "Total Picked Area (um^2)"
 key_for_protein_number = "Number of Clusters"
+# Radius for neighborhood in nanometers ( Biologically relevant distance to find the neighbouring glycan)
+glyco_radius = 35
+#radius for dimer
+dimer_radius = 36
 #set the number of classes o be mapped
 number_to_plot =5 #tp x to plot
 #Location to the folder containing cluster centers
 #pathLocsPoints = r"E:\2025-01-14_DNS006_MPZPM\FOV2\PAINT\Cell1 new clustering\90_Custom Centers"
-pathLocsPoints = str(centers_location)
+pathLocsPoints = r"F:\Insitu glycosylation_uploaded for publication - Copy\EGFR\FOV2\Cell2\90_Custom Centers"
 #convert the location to a path object
 localization_folder = Path(pathLocsPoints)
 #Search for yaml files in the folder (yaml files are created as a metadata for any reslts from picasso)
@@ -298,158 +191,159 @@ library=sorted(library)
 
 #%% this part of the code is developed exclusively to cater the need to consider the dimer glycosylation
 #<<<<<Am I a Dimer?>>>>>
-
-polymer_neighbor_master = {}
-distance_indexed_polymer_neighbor = {}
-assigned_points = {}
-if protein_present and consider_dimers:
-    df_of_interest_key = protein
-    
-    com_name = f"neighbors_of_{df_of_interest_key}" #center of mass name to be used as  the key in the dictionaries
-    polymer_neighbor_master[com_name] = {}
-    distance_indexed_polymer_neighbor[com_name] = {}
-    
-    trees = {key: KDTree((df[['x', 'y']]*130).values) for key, df in data_dict.items() if key ==df_of_interest_key}
-    # Keep track of assigned points in each dataset
-    assigned_points = {key: {} for key in trees}  # Store closest distance and index associated
-    # Retrieve the DataFrame of interest
-    df_of_interest = data_dict[df_of_interest_key]
-    # Iterate through points in the DataFrame of interest and find neighbors in other DataFrames
-    #print(f"Current core is {df_key}\n\n")
-    for row_index_of_com, column in tqdm(df_of_interest.iterrows(), desc=f"Searching for protein neighbors of {df_of_interest_key}"):
-        #Go to first point in the dataframe chosen
-        x1, y1 = column['x']*130, column['y']*130
-           #now look for neighbors standing at this point
-        # Check for neighbors in all other DataFrames using their KDTree. Iterate through each tree.
-        for current_family, current_family_members in trees.items(): #Current family = key and curent family members=KDtree
-            #Generates a list of indices coresponding to the dataframe 
-            indices = current_family_members.query_ball_point([x1, y1], r=dimer_radius)
-            filtered_indices = [num for num in indices if df_of_interest_key != current_family or num != row_index_of_com]
-           
-            if  filtered_indices:
-                
-                # Calculate scalar distances for each index # indices has the row number of the current family members
-                dist_index_pairs = [(np.linalg.norm(current_family_members.data[idx] - [x1, y1]), idx) for idx in  filtered_indices]# creates a list of tuples with(distance, indices)
+if consider_dimers:
+    polymer_neighbor_master = {}
+    distance_indexed_polymer_neighbor = {}
+    assigned_points = {}
+    if protein_present and consider_dimers:
+        df_of_interest_key = protein
+        
+        com_name = f"neighbors_of_{df_of_interest_key}" #center of mass name to be used as  the key in the dictionaries
+        polymer_neighbor_master[com_name] = {}
+        distance_indexed_polymer_neighbor[com_name] = {}
+        
+        trees = {key: KDTree((df[['x', 'y']]*130).values) for key, df in data_dict.items() if key ==df_of_interest_key}
+        # Keep track of assigned points in each dataset
+        assigned_points = {key: {} for key in trees}  # Store closest distance and index associated
+        # Retrieve the DataFrame of interest
+        df_of_interest = data_dict[df_of_interest_key]
+        # Iterate through points in the DataFrame of interest and find neighbors in other DataFrames
+        #print(f"Current core is {df_key}\n\n")
+        for row_index_of_com, column in tqdm(df_of_interest.iterrows(), desc=f"Searching for protein neighbors of {df_of_interest_key}"):
+            #Go to first point in the dataframe chosen
+            x1, y1 = column['x']*130, column['y']*130
+               #now look for neighbors standing at this point
+            # Check for neighbors in all other DataFrames using their KDTree. Iterate through each tree.
+            for current_family, current_family_members in trees.items(): #Current family = key and curent family members=KDtree
+                #Generates a list of indices coresponding to the dataframe 
+                indices = current_family_members.query_ball_point([x1, y1], r=dimer_radius)
+                filtered_indices = [num for num in indices if df_of_interest_key != current_family or num != row_index_of_com]
                
-                # Sort by distance
-                dist_index_pairs.sort(key=lambda x: x[0])
-                
-                # Find the closest point not already assigned or update if closer
-                for distance, idx in dist_index_pairs: #idx is the index of current family member
-                    # Only update if idx is unassigned or found closer
-                    if idx not in assigned_points[current_family] or distance < assigned_points[current_family][idx][0]:#idx is the index of current family member
-                        assigned_points[current_family][idx] = (distance, row_index_of_com)
-                        
-                        
-    for neighbor_family, family_member in assigned_points.items():
-        for idx, (distance, df_of_interest_idx) in family_member.items():
-            polymer_neighbor_master[com_name].setdefault(f'{df_of_interest_key}_{df_of_interest_idx}', []).append(f'{neighbor_family}_{idx}')    
-            distance_indexed_polymer_neighbor[com_name].setdefault(f'{df_of_interest_key}_{df_of_interest_idx}', []).append((f'{neighbor_family}_{idx}', distance))    
-        
-
-polymer_tuple_list = nested_dict_to_tuple_list(polymer_neighbor_master)
-polymer_list_without_mirror_duplicates=duplicates_removed_tuple_list(polymer_tuple_list)
-flattened_polymer_list= [element for tup in polymer_list_without_mirror_duplicates for element in tup]
-#elemental_duplicates_in_polymers = find_duplicates_with_counts(flattened_polymer_list) # This is not currently removed. large prportion is removed when removing the polymer
-
-#Number of unique elements in the list. This will give the number of all the proteins that have another protein as a neighbor. Ths is used to compute the total number of monomers.
-unique_items_in_flattened_polymer_list = set(flattened_polymer_list)
-
-#filter out dimers from polymers detected
-dimer_list= [t for t in polymer_list_without_mirror_duplicates if len(t) == 2]
-print("This one")
-duplicate_in_dimer_list = len(find_duplicates_with_counts(dimer_list))
-
-protein_considered_in_dimer = [element for tup in dimer_list for element in tup]
-#duplicates_in_protein_considered_in_dimer = find_duplicates_with_counts(protein_considered_in_dimer) #this shows finally how many duplicates are still in the dimers.
-
-
-
-#make a KDTree with the locations of glycans 
-tree_for_dimer = {key: KDTree((df[['x', 'y']]*130).values) for key, df in data_dict.items() if key != protein}
-#%% Glycosylating the dimer
-glycan_assigned = {}
-dimer_glycosylation = []
-for tuple_of_dimers in dimer_list:
-    coalesced_neighbors = []
-
-    for element in tuple_of_dimers:
-        family, idx = element.split('_')
-        idx = int(idx)
-        dataframe = data_dict[family]
-        # get coordinates of current point
-        x_val = dataframe.iloc[idx]['x'] * 130
-        y_val = dataframe.iloc[idx]['y'] * 130
-
-        # search in all KDTree families
-        for current_family, current_family_tree in tree_for_dimer.items():
-            # neighbor indices for that family
-            neighbor_idxs = current_family_tree.query_ball_point([x_val, y_val], r=glyco_radius)
-            neighbors = [f"{current_family}_{neighbor_idx}" for neighbor_idx in neighbor_idxs]
+                if  filtered_indices:
+                    
+                    # Calculate scalar distances for each index # indices has the row number of the current family members
+                    dist_index_pairs = [(np.linalg.norm(current_family_members.data[idx] - [x1, y1]), idx) for idx in  filtered_indices]# creates a list of tuples with(distance, indices)
+                   
+                    # Sort by distance
+                    dist_index_pairs.sort(key=lambda x: x[0])
+                    
+                    # Find the closest point not already assigned or update if closer
+                    for distance, idx in dist_index_pairs: #idx is the index of current family member
+                        # Only update if idx is unassigned or found closer
+                        if idx not in assigned_points[current_family] or distance < assigned_points[current_family][idx][0]:#idx is the index of current family member
+                            assigned_points[current_family][idx] = (distance, row_index_of_com)
+                            
+                            
+        for neighbor_family, family_member in assigned_points.items():
+            for idx, (distance, df_of_interest_idx) in family_member.items():
+                polymer_neighbor_master[com_name].setdefault(f'{df_of_interest_key}_{df_of_interest_idx}', []).append(f'{neighbor_family}_{idx}')    
+                distance_indexed_polymer_neighbor[com_name].setdefault(f'{df_of_interest_key}_{df_of_interest_idx}', []).append((f'{neighbor_family}_{idx}', distance))    
             
-            coalesced_neighbors.extend(neighbors) # group together the neighbors from two monomers
-    coalesced_neighbors = list(set(coalesced_neighbors))
-    if coalesced_neighbors:
-        glycosylated_dimer = tuple_of_dimers + tuple(coalesced_neighbors)
-        dimer_glycosylation.append(glycosylated_dimer)
-        
-demoflatten = flatten_tuple_list(dimer_glycosylation)
-demoduplicate = find_duplicates_with_counts(demoflatten)
-
-seen = set()
-dimer_glycosylation_glycan_unduplicated = [None] * len(dimer_glycosylation)
-print("fhfhfh")
-# process tuples from smallest to largest
-for i in sorted(range(len(dimer_glycosylation)), key=lambda i: len(dimer_glycosylation[i])):
-    dimer_glycosylation_glycan_unduplicated[i] = tuple(
-        x for x in dimer_glycosylation[i]
-        if x not in demoduplicate or (x not in seen and not seen.add(x))
-    )
-
-demoflatten = flatten_tuple_list(dimer_glycosylation_glycan_unduplicated)
-demoduplicate = find_duplicates_with_counts(demoflatten)
-
-index_removed_dimer_glycosylation =[]
-for tup in dimer_glycosylation_glycan_unduplicated:
-    # Remove numeric indices from each element
-    cleaned_tuple = tuple(element.split('_')[0] for element in tup)
-    index_removed_dimer_glycosylation.append(cleaned_tuple)
-
-# Sort each tuple alphabetically
-index_removed_dimer_glycosylation_ = [tuple(sorted(tup)) for tup in index_removed_dimer_glycosylation]
-index_removed_dimer_glycosylation = [t for t in index_removed_dimer_glycosylation_ if t.count(protein)==2]
+    
+    polymer_tuple_list = nested_dict_to_tuple_list(polymer_neighbor_master)
+    polymer_list_without_mirror_duplicates=duplicates_removed_tuple_list(polymer_tuple_list)
+    flattened_polymer_list= [element for tup in polymer_list_without_mirror_duplicates for element in tup]
+    #elemental_duplicates_in_polymers = find_duplicates_with_counts(flattened_polymer_list) # This is not currently removed. large prportion is removed when removing the polymer
+    
+    #Number of unique elements in the list. This will give the number of all the proteins that have another protein as a neighbor. Ths is used to compute the total number of monomers.
+    unique_items_in_flattened_polymer_list = set(flattened_polymer_list)
+    
+    #filter out dimers from polymers detected
+    dimer_list= [t for t in polymer_list_without_mirror_duplicates if len(t) == 2]
+    print("This one")
+    duplicate_in_dimer_list = len(find_duplicates_with_counts(dimer_list))
+    
+    protein_considered_in_dimer = [element for tup in dimer_list for element in tup]
+    #duplicates_in_protein_considered_in_dimer = find_duplicates_with_counts(protein_considered_in_dimer) #this shows finally how many duplicates are still in the dimers.
+    
+    
+    
+    #make a KDTree with the locations of glycans 
+    tree_for_dimer = {key: KDTree((df[['x', 'y']]*130).values) for key, df in data_dict.items() if key != protein}
+#%% Glycosylating the dimer
+if consider_dimers:
+    glycan_assigned = {}
+    dimer_glycosylation = []
+    for tuple_of_dimers in dimer_list:
+        coalesced_neighbors = []
+    
+        for element in tuple_of_dimers:
+            family, idx = element.split('_')
+            idx = int(idx)
+            dataframe = data_dict[family]
+            # get coordinates of current point
+            x_val = dataframe.iloc[idx]['x'] * 130
+            y_val = dataframe.iloc[idx]['y'] * 130
+    
+            # search in all KDTree families
+            for current_family, current_family_tree in tree_for_dimer.items():
+                # neighbor indices for that family
+                neighbor_idxs = current_family_tree.query_ball_point([x_val, y_val], r=glyco_radius)
+                neighbors = [f"{current_family}_{neighbor_idx}" for neighbor_idx in neighbor_idxs]
+                
+                coalesced_neighbors.extend(neighbors) # group together the neighbors from two monomers
+        coalesced_neighbors = list(set(coalesced_neighbors))
+        if coalesced_neighbors:
+            glycosylated_dimer = tuple_of_dimers + tuple(coalesced_neighbors)
+            dimer_glycosylation.append(glycosylated_dimer)
+            
+    demoflatten = flatten_tuple_list(dimer_glycosylation)
+    demoduplicate = find_duplicates_with_counts(demoflatten)
+    
+    seen = set()
+    dimer_glycosylation_glycan_unduplicated = [None] * len(dimer_glycosylation)
+    print("fhfhfh")
+    # process tuples from smallest to largest
+    for i in sorted(range(len(dimer_glycosylation)), key=lambda i: len(dimer_glycosylation[i])):
+        dimer_glycosylation_glycan_unduplicated[i] = tuple(
+            x for x in dimer_glycosylation[i]
+            if x not in demoduplicate or (x not in seen and not seen.add(x))
+        )
+    
+    demoflatten = flatten_tuple_list(dimer_glycosylation_glycan_unduplicated)
+    demoduplicate = find_duplicates_with_counts(demoflatten)
+    
+    index_removed_dimer_glycosylation =[]
+    for tup in dimer_glycosylation_glycan_unduplicated:
+        # Remove numeric indices from each element
+        cleaned_tuple = tuple(element.split('_')[0] for element in tup)
+        index_removed_dimer_glycosylation.append(cleaned_tuple)
+    
+    # Sort each tuple alphabetically
+    index_removed_dimer_glycosylation_ = [tuple(sorted(tup)) for tup in index_removed_dimer_glycosylation]
+    index_removed_dimer_glycosylation = [t for t in index_removed_dimer_glycosylation_ if t.count(protein)==2]
 
 #%%
 # Count frequency
-frequency = Counter(index_removed_dimer_glycosylation)
-# Normalize by area
-dimers_per_sq_microns = {str(k): v / area_of_cell for k, v in frequency.items()}
-
-# Sort by value descending
-dimers_per_sq_microns_sorted = OrderedDict(
-    sorted(dimers_per_sq_microns.items(), key=lambda x: x[1], reverse=True))
-# Save to JSON
-if save:
-    dimer_glycosylation_file_path = localization_folder / f"{timestamp}_{dimer_radius}nm_dimer_glycosylation_per_sq_microns.json"
-    with open(dimer_glycosylation_file_path, 'w') as file:
-        json.dump(dimers_per_sq_microns_sorted, file, indent=4)
-#%%debug: Collect the glycans in dimers
-glycan_in_dimer = []
-
-for t in dimer_glycosylation_glycan_unduplicated:
-    protein_matches = []
+    frequency = Counter(index_removed_dimer_glycosylation)
+    # Normalize by area
+    dimers_per_sq_microns = {str(k): v / area_of_cell for k, v in frequency.items()}
     
-    for s in t:
-        if isinstance(s, str):
-            parts = s.split("_")
-            if len(parts) == 2 and parts[0] == protein and parts[1].isdigit():
-                protein_matches.append(s)
-
-    # only consider tuples where protein appears 2 times
-    if len(protein_matches) == 2:
+    # Sort by value descending
+    dimers_per_sq_microns_sorted = OrderedDict(
+        sorted(dimers_per_sq_microns.items(), key=lambda x: x[1], reverse=True))
+    # Save to JSON
+    if save:
+        dimer_glycosylation_file_path = localization_folder / f"{timestamp}_{dimer_radius}nm_dimer_glycosylation_per_sq_microns.json"
+        with open(dimer_glycosylation_file_path, 'w') as file:
+            json.dump(dimers_per_sq_microns_sorted, file, indent=4)
+#%%debug: Collect the glycans in dimers
+    glycan_in_dimer = []
+    
+    for t in dimer_glycosylation_glycan_unduplicated:
+        protein_matches = []
+        
         for s in t:
-            if s not in protein_matches:
-                glycan_in_dimer.append(s)           
+            if isinstance(s, str):
+                parts = s.split("_")
+                if len(parts) == 2 and parts[0] == protein and parts[1].isdigit():
+                    protein_matches.append(s)
+    
+        # only consider tuples where protein appears 2 times
+        if len(protein_matches) == 2:
+            for s in t:
+                if s not in protein_matches:
+                    glycan_in_dimer.append(s)           
 
 #%%HDF5<<<<<<<<<MONOMER>>>>>>>>>>>>>>>>>>>>>>>
 #Dictionary for storing the neighbors with core point as the key
@@ -894,171 +788,36 @@ if save:
 plt.close("all")
 
 
-
-#%%
-#########################Nearest Neighbor Analysis#############################
-from tqdm import tqdm
-from pathlib import Path
-import datetime
-import numpy as np
-import pandas as pd
-from matplotlib import pyplot as plt
-import functionsAll as funct
-import json
-plt.rcParams["axes.grid"] = False
-
-funct.save= True
-#Choose if you want to annotate the peaks of histogram
-funct.annotate = False
-funct.FIGFORMAT = FIGFORMAT
-
-# %% paths and name dictionary
-
-
-# =============================================================================
-# paths to the csv files to analyse
-# 
-# if the csv files ares the same for the points in search of a neig
-# and those that make up the pool of potential neighbors, 
-# then pathLocsPoints = 'path/to/folder'
-# and pathLocsNeighbors = pathLocsPoints
-# =============================================================================
-
-# path to the csv files of the points in search of neigbors
-
-pathLocsNeighbors = pathLocsPoints
-
-# =============================================================================
-# dictionary of equivalence: names of source files and futur names of new 
-# created files and figures
-# 
-# to update when new lectins are used 
-# =============================================================================
-
-
-
-# =============================================================================
-# histogram parameters
-# =============================================================================
-
-# histogram distances points to nearest neighbors in same channel
-upper_limit = 300  # maximum display x axis
-bin_size = 2  # bin size   
-#%% import from hdf5
-
-# makes 1 dictionary of arrays for the localizations of the points of all the channels
-dictionaryLocalizationsPoints = funct.MultChannelsCallToDict_hdf5(pathLocsPoints, "locs")
-
-orderedNames = list(dictionaryLocalizationsPoints.keys())
-# if the paths are the same, there is no need to import the files again 
-if pathLocsNeighbors == pathLocsPoints:
-    dictionaryLocalizationsNeighbors = dict(dictionaryLocalizationsPoints)
-
-else:
-    dictionaryLocalizationsNeighbors = funct.MultChannelsCallToDict_hdf5(pathLocsNeighbors, "locs")
-
-
-# %% new folder for analysis data
-
-# =============================================================================
-# crates new folder for the analysis data named as current date if no analysis 
-# before on the same day
-# if the folder already exists - nothing is done
-# =============================================================================
-timenow = datetime.datetime.now().strftime("%Y%m%d_%H-%M-%S")
-
-pathNewFolder = pathLocsPoints + '/' + str(timenow)
-if not Path(pathNewFolder).exists():
-    Path(pathNewFolder).mkdir()
-
-# %% distance to first nearest neighbor for one in all six channels
-
-
-maxima_x = pd.DataFrame(index=dictionaryLocalizationsPoints.keys(), columns=dictionaryLocalizationsPoints.keys())
-
-for i in tqdm(dictionaryLocalizationsPoints.keys()):
-
-    # calculate the nearest neighbor for every point in that channel in all the others including itself
-    dictionaryDist = funct.nearestNeighborsOneInAll({i: dictionaryLocalizationsPoints[i]},
-                                                    dictionaryLocalizationsNeighbors)
-
-    nameCSV = timenow + '_DistNN_' + i + '_In_All'
-    if list(dictionaryLocalizationsNeighbors.keys())[0].casefold().find('random') >= 0:
-        nameCSV = nameCSV + 'random'
-    if list(dictionaryLocalizationsNeighbors.keys())[0].casefold().find('centroid') >= 0:
-        nameCSV = nameCSV + '_centroids'
-
-    # save to csv (in the new folder inside original folder of the raw data)
-    funct.dictionaryToCsv(dictionaryDist, pathNewFolder + '/' + nameCSV + '.csv')
-
-    # =============================================================================
-    #     distance to NN of one channel in itself is displayed separatly
-    #     than the crosschannel distances to NN
-    # =============================================================================    
-
-    nameFIG = timenow + '_HistDistNN_' + i + '_In_All'
-    if list(dictionaryLocalizationsNeighbors.keys())[0].casefold().find('random') >= 0:
-        nameFIG = nameFIG + 'random'
-    if list(dictionaryLocalizationsNeighbors.keys())[0].casefold().find('centroid') >= 0:
-        nameFIG = nameFIG + '_centroids'
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
         
-    #FIXME
-    maxima_x = maxima_x.loc[orderedNames, orderedNames]    
-    maxima_x = funct.displayHistFigure(
-    dictionaryDist,  # Pass the entire dictionary without filtering
-    rangeUp=upper_limit,  # Max X value for histogram display
-    binsize=bin_size,  # Histogram bin size
-    path=pathNewFolder + '/' + nameFIG,  # Save path for the figure
-    maxima_matrix_x=maxima_x  # Passing previous maxima_x values
-)
-    maxima_x = maxima_x.loc[orderedNames, orderedNames]
-
-    # =============================================================================
-    #     the csv files of distance to NN and figures 
-    #     are automatically saved in a new folder (1/per day) inside the original 
-    #     folder of the point in search of a neighbor (pathLocsPoints)
-    # =============================================================================
-
-    continue
-    # (for tqdm)
-
-print(maxima_x)
-
-nameFigMatrix = timenow + '_nN_matrix'
-funct.plot_matrix_histogram(maxima_x, path=pathNewFolder + '/' + nameFigMatrix)
-
-# save analysis parameters in txt file
-
-# =============================================================================
-# all the parameters used in the analysis are saved in a txt file
-# the txt files name starts with the same timestamp than the new data files
-# the txt file is saved with the new data files in the folder created for the day
-# =============================================================================
-
-
-parametersfilename = timenow + '_Parameters.txt'
-
-# w tells python we are opening the file to write into it
-outfile = open(pathNewFolder + '/' + parametersfilename, 'w')
-
-outfile.write('Path to points for which to find neighbors : ' + pathLocsPoints + '\n\n')
-outfile.write('Path to pools of potential neighbors : ' + pathLocsNeighbors + '\n\n')
-outfile.write('Range histogram : 0-' + str(upper_limit) + ' (nm) \n\n')
-outfile.write('bin size histogram : ' + str(bin_size) + ' (nm) \n\n')
-outfile.close()  # Close the file when done
-#plt.close('all')
-
-#%%Combine the NN distance histogram peaks to a single file
-
-keyword = "peaks"
-pathNewFolder = Path(pathNewFolder)
-peaks_combined_output_file = pathNewFolder / "Peaks_Combined.json"
-combined_data = {}
-for file in pathNewFolder.rglob(f"*{keyword}.json"):
-    with file.open("r", encoding="utf-8") as f:
-        data = json.load(f)
-        combined_data.update(data)
-
-# Write the combined data to a single JSON file
-peaks_combined_output_file.write_text(json.dumps(combined_data, indent=4), encoding="utf-8")
 
