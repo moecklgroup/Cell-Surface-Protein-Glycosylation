@@ -18,10 +18,26 @@ import functionsAll as funct
 import json
 plt.rcParams["axes.grid"] = False
 
-funct.save= False
+funct.save= True
 #Choose if you want to annotate the peaks of histogram
 funct.annotate = False
-funct.FIGFORMAT = '.png'
+funct.FIGFORMAT = '.pdf'
+plt.rcParams.update({
+    "pdf.fonttype": 42,        # TrueType fonts (editable in Illustrator)
+    "ps.fonttype": 42,
+    "font.family": "sans-serif",
+    "axes.unicode_minus": False,
+
+    # Avoid transparency issues
+    "savefig.transparent": False,
+
+    # Keep vectors clean
+    "path.simplify": False,
+
+    # Use standard RGB
+    "figure.facecolor": "white",
+})
+
 
 # %% paths and name dictionary
 
@@ -36,7 +52,7 @@ funct.FIGFORMAT = '.png'
 # =============================================================================
 
 # path to the csv files of the points in search of neigbors
-pathLocsPoints = r"C:\Users\dmoonnu\Desktop\New code test data\Cell2"
+pathLocsPoints = r"C:\Users\dmoonnu\Documents\Glycan atlassing weekend fix\2024-10-17_Tissue_Section_DS031 FOV2"
 # path to the csv files of the points - pool of potential neighbors 
 pathLocsNeighbors = pathLocsPoints
 # pathLocsPointspath = Path(pathLocsPoints)
